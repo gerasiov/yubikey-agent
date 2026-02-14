@@ -18,7 +18,7 @@ Written in pure Go, it's based on [github.com/go-piv/piv-go](https://github.com/
 ```
 brew install yubikey-agent
 brew services start yubikey-agent
-yubikey-agent -setup # generate a new key on the YubiKey
+yubikey-agent -setup # setup YubiKey and generate a new key on it
 ```
 
 Then add the following line to your `~/.zshrc` and restart the shell.
@@ -116,9 +116,7 @@ This does not affect the FIDO2 functionality.
 
 ### Changing PIN and PUK
 
-Use YubiKey Manager to change the PIN and PUK.
-
-`yubikey-agent -setup` sets the PUK to the same value as the PIN.
+Use YubiKey Manager if you need to change the PIN and PUK.
 
 ```
 killall -HUP yubikey-agent
@@ -128,9 +126,7 @@ ykman piv access change-puk
 
 ### Unblocking the PIN with the PUK
 
-If the wrong PIN is entered incorrectly three times in a row, YubiKey Manager can be used to unlock it.
-
-`yubikey-agent -setup` sets the PUK to the same value as the PIN.
+If the wrong PIN is entered incorrectly three times in a row, YubiKey Manager can be used to unlock it with PUK.
 
 ```
 ykman piv access unblock-pin

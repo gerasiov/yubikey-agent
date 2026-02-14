@@ -76,36 +76,42 @@ func runReset(yk *piv.YubiKey) {
 	}
 }
 
+func readPass(name string) string {
+	for {
+		fmt.Printf("Enter new %s: ", name)
+		pass, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Print("\n")
+		if err != nil {
+			log.Fatalf("Failed to read %s: %v\n", name, err)
+		}
+		if len(pass) < 6 || len(pass) > 8 {
+			log.Fatalf("The %s needs to be 6-8 characters.\n", name)
+		}
+		fmt.Printf("Repeat %s: ", name)
+		repeat, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Print("\n")
+		if err != nil {
+			log.Fatalf("Failed to read %s: %v\n", name, err)
+		} else if bytes.Equal(repeat, pass) {
+			return string(pass)
+		}
+		log.Printf("%ss don't match!\n", name)
+	}
+}
+
 func runSetup(yk *piv.YubiKey) {
 	if isInitialized(yk) {
 		log.Println("‼️  This YubiKey looks already setup")
 		log.Println("")
 		log.Println("If you want to wipe all PIV keys and start fresh,")
 		log.Fatalln("use --really-delete-all-piv-keys ⚠️")
-	} else if !errors.Is(err, piv.ErrNotFound) {
-		log.Fatalln("Failed to access authentication slot:", err)
 	}
 
-	fmt.Println("🔐 The PIN is up to 8 numbers, letters, or symbols. Not just numbers!")
+	fmt.Println("🔐 The PIN/PUK are up to 8 numbers, letters, or symbols. Not just numbers!")
 	fmt.Println("❌ The key will be lost if the PIN and PUK are locked after 3 incorrect tries.")
 	fmt.Println("")
-	fmt.Print("Choose a new PIN/PUK: ")
-	pin, err := term.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Print("\n")
-	if err != nil {
-		log.Fatalln("Failed to read PIN:", err)
-	}
-	if len(pin) < 6 || len(pin) > 8 {
-		log.Fatalln("The PIN needs to be 6-8 characters.")
-	}
-	fmt.Print("Repeat PIN/PUK: ")
-	repeat, err := term.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Print("\n")
-	if err != nil {
-		log.Fatalln("Failed to read PIN:", err)
-	} else if !bytes.Equal(repeat, pin) {
-		log.Fatalln("PINs don't match!")
-	}
+	pin := readPass("PIN")
+	puk := readPass("PUK")
 
 	fmt.Println("")
 	fmt.Println("🧪 Reticulating splines...")
@@ -128,7 +134,7 @@ func runSetup(yk *piv.YubiKey) {
 	}); err != nil {
 		log.Fatalln("Failed to store the Management Key on the device:", err)
 	}
-	if err := yk.SetPIN(piv.DefaultPIN, string(pin)); err != nil {
+	if err := yk.SetPIN(piv.DefaultPIN, pin); err != nil {
 		log.Println("‼️  The default PIN did not work")
 		log.Println("")
 		log.Println("If you know what you're doing, reset PIN, PUK, and")
@@ -137,7 +143,7 @@ func runSetup(yk *piv.YubiKey) {
 		log.Println("If you want to wipe all PIV keys and start fresh,")
 		log.Fatalln("use --really-delete-all-piv-keys ⚠️")
 	}
-	if err := yk.SetPUK(piv.DefaultPUK, string(pin)); err != nil {
+	if err := yk.SetPUK(piv.DefaultPUK, puk); err != nil {
 		log.Println("‼️  The default PUK did not work")
 		log.Println("")
 		log.Println("If you know what you're doing, reset PIN, PUK, and")

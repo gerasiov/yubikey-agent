@@ -40,7 +40,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\n")
 		fmt.Fprintf(os.Stderr, "\tyubikey-agent -setup\n")
 		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "\t\tGenerate a new SSH key on the attached YubiKey.\n")
+		fmt.Fprintf(os.Stderr, "\t\tSetup YubiKey and generate a new SSH key on it.\n")
+		fmt.Fprintf(os.Stderr, "\tyubikey-agent -add-key\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "\t\tGenerate additional SSH key on the attached YubiKey.\n")
 		fmt.Fprintf(os.Stderr, "\n")
 		fmt.Fprintf(os.Stderr, "\tyubikey-agent -l PATH\n")
 		fmt.Fprintf(os.Stderr, "\n")
@@ -51,6 +54,7 @@ func main() {
 	socketPath := flag.String("l", "", "agent: path of the UNIX socket to listen on")
 	resetFlag := flag.Bool("really-delete-all-piv-keys", false, "setup: reset the PIV applet")
 	setupFlag := flag.Bool("setup", false, "setup: configure a new YubiKey")
+	addKeyFlag := flag.Bool("add-key", false, "setup: generate a new SSH key on the YubiKey")
 	flag.Parse()
 
 	if flag.NArg() > 0 {
@@ -64,8 +68,15 @@ func main() {
 		if *resetFlag {
 			runReset(yk)
 		}
-		runSetup(yk)
+		key := runSetup(yk)
+		runAddKey(yk, key)
+	} else if *addKeyFlag {
+		log.SetFlags(0)
+		yk := connectForSetup()
+		key := getManagementKey(yk)
+		runAddKey(yk, key)
 	} else {
+		// Agent mode
 		if *socketPath == "" {
 			flag.Usage()
 			os.Exit(1)

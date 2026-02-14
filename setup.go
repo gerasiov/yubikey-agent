@@ -18,6 +18,7 @@ import (
 	"math/big"
 	"os"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/go-piv/piv-go/piv"
@@ -99,6 +100,62 @@ func readPass(name string) string {
 	}
 }
 
+// parseSlot converts a string to piv.Slot
+func parseSlot(slot string) (piv.Slot, error) {
+	slot = strings.TrimPrefix(slot, "0x")
+	switch slot {
+	case "", "9a":
+		return piv.SlotAuthentication, nil
+	case "9c":
+		return piv.SlotSignature, nil
+	case "9d":
+		return piv.SlotKeyManagement, nil
+	case "9e":
+		return piv.SlotCardAuthentication, nil
+	default:
+		// Try parsing as retired key management slot (0x82-0x95)
+		var key uint32
+		if _, err := fmt.Sscanf(slot, "%x", &key); err != nil {
+			return piv.Slot{}, fmt.Errorf("invalid slot identifier: %s", slot)
+		}
+		slot_, ok := piv.RetiredKeyManagementSlot(key)
+		if !ok {
+			return piv.Slot{}, fmt.Errorf("invalid retired key management slot: %s", slot)
+		}
+		return slot_, nil
+	}
+}
+
+// parseTouchPolicy converts a string to piv.TouchPolicy
+func parseTouchPolicy(policy string) (piv.TouchPolicy, error) {
+	switch policy {
+	case "", "always":
+		return piv.TouchPolicyAlways, nil
+	case "never":
+		return piv.TouchPolicyNever, nil
+	case "cached":
+		return piv.TouchPolicyCached, nil
+	default:
+		return 0, fmt.Errorf("invalid touch policy: %s (must be 'never', 'always', or 'cached')", policy)
+	}
+}
+
+// parseAlgorithm converts a string to piv.Algorithm
+func parseAlgorithm(algo string) (piv.Algorithm, error) {
+	switch algo {
+	case "", "ec256":
+		return piv.AlgorithmEC256, nil
+	case "ec384":
+		return piv.AlgorithmEC384, nil
+	case "ed25519":
+		return piv.AlgorithmEd25519, nil
+	case "rsa2048":
+		return piv.AlgorithmRSA2048, nil
+	default:
+		return 0, fmt.Errorf("invalid algorithm: %s (must be 'ec256', 'ec384', 'ed25519' or 'rsa2048')", algo)
+	}
+}
+
 func runSetup(yk *piv.YubiKey) [24]byte {
 	if isInitialized(yk) {
 		log.Println("‼️  This YubiKey looks already setup")
@@ -174,12 +231,27 @@ func getManagementKey(yk *piv.YubiKey) [24]byte {
 	return *managementKey
 }
 
-func runAddKey(yk *piv.YubiKey, managementKey [24]byte) {
+func runAddKey(yk *piv.YubiKey, managementKey [24]byte, slot string, algo string, touchPolicy string) {
+	slot_, err := parseSlot(slot)
+	if err != nil {
+		log.Fatalln("Failed to parse slot:", err)
+	}
 
-	pub, err := yk.GenerateKey(managementKey, piv.SlotAuthentication, piv.Key{
-		Algorithm:   piv.AlgorithmEC256,
+	algo_, err := parseAlgorithm(algo)
+	if err != nil {
+		log.Fatalln("Failed to parse algorithm:", err)
+	}
+
+	touchPolicy_, err := parseTouchPolicy(touchPolicy)
+	if err != nil {
+		log.Fatalln("Failed to parse touch policy:", err)
+	}
+
+	log.Println("Generating key on the YubiKey...")
+	pub, err := yk.GenerateKey(managementKey, slot_, piv.Key{
+		Algorithm:   algo_,
 		PINPolicy:   piv.PINPolicyOnce,
-		TouchPolicy: piv.TouchPolicyAlways,
+		TouchPolicy: touchPolicy_,
 	})
 	if err != nil {
 		log.Fatalln("Failed to generate key:", err)
@@ -213,7 +285,7 @@ func runAddKey(yk *piv.YubiKey, managementKey [24]byte) {
 	if err != nil {
 		log.Fatalln("Failed to parse certificate:", err)
 	}
-	if err := yk.SetCertificate(managementKey, piv.SlotAuthentication, cert); err != nil {
+	if err := yk.SetCertificate(managementKey, slot_, cert); err != nil {
 		log.Fatalln("Failed to store certificate:", err)
 	}
 

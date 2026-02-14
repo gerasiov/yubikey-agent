@@ -55,6 +55,9 @@ func main() {
 	resetFlag := flag.Bool("really-delete-all-piv-keys", false, "setup: reset the PIV applet")
 	setupFlag := flag.Bool("setup", false, "setup: configure a new YubiKey")
 	addKeyFlag := flag.Bool("add-key", false, "setup: generate a new SSH key on the YubiKey")
+	keySlot := flag.String("slot", "", "setup: PIV slot for the new SSH key (9a, 9c, 9d, 9e, 82-95)")
+	keyAlgo := flag.String("algo", "", "setup: algorithm for the new SSH key (ec256(default), ec384, ed25519, rsa2048)")
+	keyTouchPolicy := flag.String("touch-policy", "cached", "setup: touch policy for the new SSH key (cached, always(default) or never)")
 	flag.Parse()
 
 	if flag.NArg() > 0 {
@@ -69,12 +72,12 @@ func main() {
 			runReset(yk)
 		}
 		key := runSetup(yk)
-		runAddKey(yk, key)
+		runAddKey(yk, key, *keySlot, *keyAlgo, *keyTouchPolicy)
 	} else if *addKeyFlag {
 		log.SetFlags(0)
 		yk := connectForSetup()
 		key := getManagementKey(yk)
-		runAddKey(yk, key)
+		runAddKey(yk, key, *keySlot, *keyAlgo, *keyTouchPolicy)
 	} else {
 		// Agent mode
 		if *socketPath == "" {

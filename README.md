@@ -136,11 +136,79 @@ If the PUK is also entered incorrectly three times, the key is permanently irrec
 
 ### Manual setup and technical details
 
-`yubikey-agent` only officially supports YubiKeys set up with `yubikey-agent -setup`.
+`yubikey-agent` only officially supports YubiKeys set up with `yubikey-agent -setup` and `yubikey-agent -add-key`.
 
 In practice, any PIV token with an RSA or ECDSA P-256 key and certificate in the Authentication slot should work, with any PIN and touch policy. Simply skip the setup step and use `ssh-add -L` to view the public key.
 
 `yubikey-agent -setup` generates a random Management Key and [stores it in PIN-protected metadata](https://pkg.go.dev/github.com/go-piv/piv-go/piv?tab=doc#YubiKey.SetMetadata).
+
+### Using multiple slots
+
+`yubikey-agent` supports using multiple PIV slots on your YubiKey, allowing you to store several SSH keys with different security policies.
+
+#### Available slots
+
+- **Standard slots**: `9a` (Authentication), `9c` (Signature), `9d` (Key Management), `9e` (Card Authentication)
+- **Retired Key Management slots**: `82` through `95` (20 additional slots)
+
+#### Setting up your YubiKey
+
+**Initial setup** (fresh YubiKey):
+
+```bash
+yubikey-agent -setup
+```
+
+This will:
+- Set up a new PIN and PUK (6-8 characters)
+- Generate and store a management key
+- Create an SSH key in the default slot (9a)
+
+**Adding keys to additional slots:**
+
+```bash
+yubikey-agent -addkey -slot 9c
+```
+
+This will:
+- Ask for your current PIN
+- Retrieve the management key from the YubiKey
+- Generate a new SSH key in the specified slot
+- No changes to PIN/PUK
+
+You can customize the security policies and algorithm for each slot:
+
+```bash
+yubikey-agent -setup -slot 9a -algo ec256 -touch-policy always
+yubikey-agent -addkey -slot 9c -algo rsa2048 -touch-policy cached
+```
+
+**Key algorithms:**
+- `ec256` (default): ECDSA P-256 curve
+- `ec384`: ECDSA P-384 curve
+- `ed25519`: Ed25519 curve
+- `rsa2048`: RSA 2048-bit
+
+**Touch policies:**
+- `always` (default): Requires a physical touch for every operation
+- `never`: No touch required
+- `cached`: Touch is cached for 15 seconds
+
+#### Using multiple keys in agent
+`yubikey-agent` will automatically load all valid keys from the configured slots. You can list them with:
+
+```bash
+ssh-add -L
+```
+or
+```bash
+ykman piv info
+```
+
+If you (for some reason) want to use only a specific slots, you can pass them as a comma-separated list to the agent's `-slots` flag:
+```bash
+yubikey-agent -l /path/to/agent.socket -slots 9a,9c
+```
 
 ### Alternatives
 

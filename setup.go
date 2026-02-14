@@ -13,7 +13,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -50,6 +49,17 @@ func connectForSetup() *piv.YubiKey {
 	return yk
 }
 
+func isInitialized(yk *piv.YubiKey) bool {
+	if err := yk.SetManagementKey(piv.DefaultManagementKey, piv.DefaultManagementKey); err != nil {
+		return true
+	}
+	// This could affect tries counter
+	if _, err := yk.Metadata(piv.DefaultPIN); err != nil {
+		return true
+	}
+	return false
+}
+
 func runReset(yk *piv.YubiKey) {
 	fmt.Print(`Do you want to reset the PIV applet? This will delete all PIV keys. Type "delete": `)
 	var res string
@@ -67,7 +77,7 @@ func runReset(yk *piv.YubiKey) {
 }
 
 func runSetup(yk *piv.YubiKey) {
-	if _, err := yk.Certificate(piv.SlotAuthentication); err == nil {
+	if isInitialized(yk) {
 		log.Println("‼️  This YubiKey looks already setup")
 		log.Println("")
 		log.Println("If you want to wipe all PIV keys and start fresh,")
